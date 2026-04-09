@@ -24,7 +24,7 @@ def render_dashboard(providers_df: pd.DataFrame, provider_month_df: pd.DataFrame
             f"Provider Opportunity Dashboard</h2>",
             unsafe_allow_html=True,
         )
-        st.caption("Ranked by peer-normalized opportunity score. Click any row to view provider details.")
+        st.caption("Ranked by peer-normalized opportunity score. Click Open to view provider details.")
     with col_info:
         st.markdown(
             f"<div style='background:{COLORS['meridian_gold']};padding:8px 12px;border-radius:6px;"
@@ -63,37 +63,66 @@ def render_dashboard(providers_df: pd.DataFrame, provider_month_df: pd.DataFrame
 
     # ── Ranked table ──────────────────────────────────────────────────────────
     st.markdown(f"**All Providers — {_fmt_period(period)}**")
-    st.caption("Click any row to view provider details.")
+    st.caption("Click **Open** to view a provider's full report card.")
 
-    display_cols = [
-        "Rank", "Provider", "Specialty", "wRVU (Actual)", "Peer Median",
-        "Gap", "Opp. Score", "Top Driver", "Confidence", "Signal",
-    ]
-    max_score = max(int(ranked_df["Opp. Score"].max()) + 10, 10)
+    # Column proportions: #, Provider, Specialty, wRVU, Peer Med, Gap, Score, Signal, button
+    WIDTHS = [0.3, 1.7, 1.5, 0.9, 1.0, 0.75, 0.75, 1.2, 0.7]
+    HEADERS = ["#", "Provider", "Specialty", "wRVU", "Peer Med.", "Gap", "Score", "Signal", ""]
 
-    event = st.dataframe(
-        ranked_df[display_cols],
-        use_container_width=True,
-        hide_index=True,
-        height=min(600, 42 + len(ranked_df) * 35),
-        on_select="rerun",
-        selection_mode="single-row",
-        column_config={
-            "Opp. Score": st.column_config.ProgressColumn(
-                "Opp. Score",
-                min_value=0,
-                max_value=max_score,
-                format="%d",
-            ),
-        },
-    )
+    # Header row
+    hcols = st.columns(WIDTHS)
+    for col, label in zip(hcols, HEADERS):
+        col.markdown(
+            f"<span style='font-size:11px;color:#888;font-weight:700;"
+            f"text-transform:uppercase;letter-spacing:0.4px;'>{label}</span>",
+            unsafe_allow_html=True,
+        )
+    st.markdown("<hr style='margin:4px 0 0 0;border-color:#ddd;'>", unsafe_allow_html=True)
 
-    if event.selection.rows:
-        selected_idx = event.selection.rows[0]
-        selected_id = ranked_df.iloc[selected_idx]["provider_id"]
-        st.session_state.epd_selected_provider = selected_id
-        st.session_state.epd_current_page = "drilldown"
-        st.rerun()
+    # Signal and gap colour maps
+    sig_colors  = {"Below Target": "#B71C1C", "Watch": "#B45309", "On Track": "#1A7A4A"}
+
+    # Data rows
+    for _, row in ranked_df.iterrows():
+        sig_color = sig_colors.get(row["Signal"], "#888")
+        gap_color = "#B71C1C" if row["Gap"] < 0 else "#1A7A4A"
+
+        rcols = st.columns(WIDTHS)
+        rcols[0].markdown(
+            f"<p style='margin:0;font-size:12px;color:#aaa;padding-top:7px;'>{int(row['Rank'])}</p>",
+            unsafe_allow_html=True)
+        rcols[1].markdown(
+            f"<p style='margin:0;font-size:13px;font-weight:600;padding-top:7px;'>{row['Provider']}</p>",
+            unsafe_allow_html=True)
+        rcols[2].markdown(
+            f"<p style='margin:0;font-size:13px;color:#555;padding-top:7px;'>{row['Specialty']}</p>",
+            unsafe_allow_html=True)
+        rcols[3].markdown(
+            f"<p style='margin:0;font-size:13px;padding-top:7px;'>{row['wRVU (Actual)']:.0f}</p>",
+            unsafe_allow_html=True)
+        rcols[4].markdown(
+            f"<p style='margin:0;font-size:13px;padding-top:7px;'>{row['Peer Median']:.0f}</p>",
+            unsafe_allow_html=True)
+        rcols[5].markdown(
+            f"<p style='margin:0;font-size:13px;color:{gap_color};font-weight:700;padding-top:7px;'>"
+            f"{row['Gap']:+.0f}</p>",
+            unsafe_allow_html=True)
+        rcols[6].markdown(
+            f"<p style='margin:0;font-size:13px;font-weight:700;padding-top:7px;'>"
+            f"{row['Opp. Score']:.0f}</p>",
+            unsafe_allow_html=True)
+        rcols[7].markdown(
+            f"<p style='margin:0;font-size:12px;color:{sig_color};font-weight:600;padding-top:7px;'>"
+            f"{row['Signal']}</p>",
+            unsafe_allow_html=True)
+        if rcols[8].button("Open →", key=f"drill_{row['provider_id']}", use_container_width=True):
+            st.session_state.epd_selected_provider = row["provider_id"]
+            st.session_state.epd_current_page = "drilldown"
+            st.rerun()
+
+        st.markdown(
+            "<hr style='margin:0;border:none;border-top:1px solid #f0f0f0;'>",
+            unsafe_allow_html=True)
 
     # ── Distribution chart ────────────────────────────────────────────────────
     with st.expander("Opportunity Score Distribution", expanded=True):
