@@ -1,0 +1,33 @@
+# ── Secrets ───────────────────────────────────────────────────────────────────
+.env
+
+# ── Python virtual environment ────────────────────────────────────────────────
+.venv/
+
+# ── Compiled Python ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# ── Test cache ────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Intermediate data files (DuckDB is included; parquets are re-generatable) ─
+data/*.parquet
+data/exports/
+
+# ── Archive folder (contains original confidential documents) ─────────────────
+archive/
+
+# ── Claude Code local session files ──────────────────────────────────────────
+.claude/settings.local.json
+.claude/memory/
+.claude/plans/
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
