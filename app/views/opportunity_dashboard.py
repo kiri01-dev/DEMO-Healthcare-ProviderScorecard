@@ -24,7 +24,7 @@ def render_dashboard(providers_df: pd.DataFrame, provider_month_df: pd.DataFrame
             f"Provider Opportunity Dashboard</h2>",
             unsafe_allow_html=True,
         )
-        st.caption("Ranked by peer-normalized opportunity score. Select a provider to view details.")
+        st.caption("Ranked by peer-normalized opportunity score. Click any row to view provider details.")
     with col_info:
         st.markdown(
             f"<div style='background:{COLORS['meridian_gold']};padding:8px 12px;border-radius:6px;"
@@ -61,45 +61,42 @@ def render_dashboard(providers_df: pd.DataFrame, provider_month_df: pd.DataFrame
 
     st.markdown("---")
 
-    # ── Provider selector ─────────────────────────────────────────────────────
-    st.markdown(f"**All Providers — {_fmt_period(period)}**")
-    provider_options = [
-        f"{row['Provider']} ({row['Specialty']})" for _, row in ranked_df.iterrows()
-    ]
-    selected_option = st.selectbox(
-        "Select a provider to drill into",
-        ["-- Select a provider --"] + provider_options,
-        key="dashboard_provider_select",
-    )
-
-    if selected_option != "-- Select a provider --":
-        idx = provider_options.index(selected_option)
-        selected_id = ranked_df.iloc[idx]["provider_id"]
-        st.session_state.epd_selected_provider = selected_id
-        st.session_state.epd_current_page = "drilldown"
-        st.rerun()
-
     # ── Ranked table ──────────────────────────────────────────────────────────
+    st.markdown(f"**All Providers — {_fmt_period(period)}**")
+    st.caption("Click any row to view provider details.")
+
     display_cols = [
         "Rank", "Provider", "Specialty", "wRVU (Actual)", "Peer Median",
         "Gap", "Opp. Score", "Top Driver", "Confidence", "Signal",
     ]
-    st.dataframe(
-        ranked_df[display_cols]
-        .style.background_gradient(subset=["Opp. Score"], cmap="Blues")
-        .format({
-            "wRVU (Actual)": "{:.0f}",
-            "Peer Median":   "{:.0f}",
-            "Gap":           "{:+.0f}",
-            "Opp. Score":    "{:.0f}",
-        }),
+    max_score = max(int(ranked_df["Opp. Score"].max()) + 10, 10)
+
+    event = st.dataframe(
+        ranked_df[display_cols],
         use_container_width=True,
         hide_index=True,
         height=min(600, 42 + len(ranked_df) * 35),
+        on_select="rerun",
+        selection_mode="single-row",
+        column_config={
+            "Opp. Score": st.column_config.ProgressColumn(
+                "Opp. Score",
+                min_value=0,
+                max_value=max_score,
+                format="%d",
+            ),
+        },
     )
 
+    if event.selection.rows:
+        selected_idx = event.selection.rows[0]
+        selected_id = ranked_df.iloc[selected_idx]["provider_id"]
+        st.session_state.epd_selected_provider = selected_id
+        st.session_state.epd_current_page = "drilldown"
+        st.rerun()
+
     # ── Distribution chart ────────────────────────────────────────────────────
-    with st.expander("Opportunity Score Distribution", expanded=False):
+    with st.expander("Opportunity Score Distribution", expanded=True):
         fig = px.bar(
             ranked_df.sort_values("Opp. Score", ascending=False),
             x="Provider",
